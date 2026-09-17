@@ -3,120 +3,172 @@ import 'package:get/get.dart';
 import 'package:news_app/controllers/news_controller.dart';
 import 'package:news_app/routes/app_pages.dart';
 import 'package:news_app/utils/app_colors.dart';
-import 'package:news_app/widgets/loading_shimmer.dart';
 import 'package:news_app/widgets/news_card.dart';
+import 'package:news_app/widgets/category_chip.dart';
+import 'package:news_app/widgets/loading_shimmer.dart';
 
-class HomeView extends StatelessWidget {
-  HomeView({super.key});
-
-  final NewsController controller = Get.find<NewsController>();
-  final TextEditingController _searchController = TextEditingController();
-
+class HomeView extends GetView<NewsController> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('News App'),
+        title: Text('News App'),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: Icon(Icons.search),
+            onPressed: () => _showSearchDialog(context),
+          ),
+        ],
       ),
       body: Column(
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-            child: TextField(
-              controller: _searchController,
-              textInputAction: TextInputAction.search,
-              decoration: InputDecoration(
-                hintText: 'Cari berita...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                isDense: true,
-              ),
-              onSubmitted: controller.searchNews,
+          // Categories
+          Container(
+            height: 60,
+            color: Colors.white,
+            child: ListView.builder(
+              scrollDirection: Axis.horizontal,
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              itemCount: controller.categories.length,
+              itemBuilder: (context, index) {
+                final category = controller.categories[index];
+                return Obx(
+                  () => CategoryChip(
+                    label: category.capitalize ?? category,
+                    isSelected: controller.selectedCategory == category,
+                    onTap: () => controller.selectCategory(category),
+                  ),
+                );
+              },
             ),
           ),
-          SizedBox(
-            height: 48,
-            child: Obx(
-              () => ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                scrollDirection: Axis.horizontal,
-                itemCount: controller.categories.length,
-                itemBuilder: (context, index) {
-                  final category = controller.categories[index];
-                  final isSelected = controller.selectedCategory == category;
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: ChoiceChip(
-                      label: Text(
-                        category[0].toUpperCase() + category.substring(1),
-                      ),
-                      selected: isSelected,
-                      onSelected: (_) => controller.selectCategory(category),
-                      selectedColor: AppColors.primary,
-                      labelStyle: TextStyle(
-                        color: isSelected ? Colors.white : AppColors.textSecondary,
-                        fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      ),
-                      showCheckmark: false,
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
+
+          // News List
           Expanded(
             child: Obx(() {
               if (controller.isLoading) {
                 return LoadingShimmer();
               }
 
-              if (controller.error.isNotEmpty && controller.articles.isEmpty) {
-                return Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(Icons.cloud_off, size: 48, color: AppColors.textHint),
-                      const SizedBox(height: 12),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Text(controller.error, textAlign: TextAlign.center),
-                      ),
-                      const SizedBox(height: 12),
-                      FilledButton(
-                        onPressed: controller.refreshNews,
-                        child: const Text('Coba Lagi'),
-                      ),
-                    ],
-                  ),
-                );
+              if (controller.error.isNotEmpty) {
+                return _buildErrorWidget();
               }
 
               if (controller.articles.isEmpty) {
-                return const Center(child: Text('Tidak ada berita'));
+                return _buildEmptyWidget();
               }
 
               return RefreshIndicator(
                 onRefresh: controller.refreshNews,
                 child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.all(16),
                   itemCount: controller.articles.length,
                   itemBuilder: (context, index) {
                     final article = controller.articles[index];
                     return NewsCard(
                       article: article,
-                      onTap: () => Get.toNamed(
-                        Routes.NEWS_DETAIL,
-                        arguments: article,
-                      ),
+                      onTap: () =>
+                          Get.toNamed(Routes.NEWS_DETAIL, arguments: article),
                     );
                   },
                 ),
               );
             }),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.error_outline, size: 64, color: AppColors.error),
+          SizedBox(height: 16),
+          Text(
+            'Something went wrong',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Please check your internet connection',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+          SizedBox(height: 24),
+          ElevatedButton(
+            onPressed: controller.refreshNews,
+            child: Text('Retry'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyWidget() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.newspaper, size: 64, color: AppColors.textHint),
+          SizedBox(height: 16),
+          Text(
+            'No news available',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          SizedBox(height: 8),
+          Text(
+            'Please try again later',
+            style: TextStyle(color: AppColors.textSecondary),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSearchDialog(BuildContext context) {
+    final TextEditingController searchController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Search News'),
+        content: TextField(
+          controller: searchController,
+          decoration: InputDecoration(
+            hintText: 'Enter search term...',
+            border: OutlineInputBorder(),
+          ),
+          onSubmitted: (value) {
+            if (value.isNotEmpty) {
+              controller.searchNews(value);
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              if (searchController.text.isNotEmpty) {
+                controller.searchNews(searchController.text);
+                Navigator.of(context).pop();
+              }
+            },
+            child: Text('Search'),
           ),
         ],
       ),
