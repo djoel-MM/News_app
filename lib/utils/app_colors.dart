@@ -10,6 +10,9 @@ class AppColors {
   static const Color surface = Colors.white;
   static const Color textPrimary = Color(0xFF202124);
   static const Color textSecondary = Color(0xFF5F6368);
+  static const Color textHint = Color(0xFF9E9E9E);
+  static const Color divider = Color(0xFFE0E0E0);
+  static const Color cardShadow = Color(0x1F000000);
   static const Color error = Color(0xFFD32F2F);
   static const Color shimmerBase = Color(0xFFE0E0E0);
   static const Color shimmerHighlight = Color(0xFFF5F5F5);
