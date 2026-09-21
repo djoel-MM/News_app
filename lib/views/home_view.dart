@@ -1,174 +1,160 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:news_app/controllers/main_controller.dart';
 import 'package:news_app/controllers/news_controller.dart';
 import 'package:news_app/routes/app_pages.dart';
 import 'package:news_app/utils/app_colors.dart';
-import 'package:news_app/widgets/news_card.dart';
+import 'package:news_app/utils/constants.dart';
 import 'package:news_app/widgets/category_chip.dart';
+import 'package:news_app/widgets/empty_state.dart';
+import 'package:news_app/widgets/headline_hero.dart';
 import 'package:news_app/widgets/loading_shimmer.dart';
+import 'package:news_app/widgets/news_card.dart';
+import 'package:news_app/widgets/section_header.dart';
 
+/// Beranda: sorotan utama, pilihan kategori, dan daftar berita terbaru.
 class HomeView extends GetView<NewsController> {
+  const HomeView({super.key});
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('News App'),
-        centerTitle: true,
-        actions: [
-          IconButton(
-            icon: Icon(Icons.search),
-            onPressed: () => _showSearchDialog(context),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Categories
-          Container(
-            height: 60,
-            color: Colors.white,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: controller.categories.length,
-              itemBuilder: (context, index) {
-                final category = controller.categories[index];
-                return Obx(
-                  () => CategoryChip(
-                    label: category.capitalize ?? category,
-                    isSelected: controller.selectedCategory == category,
-                    onTap: () => controller.selectCategory(category),
-                  ),
-                );
-              },
-            ),
-          ),
+    final scheme = Theme.of(context).colorScheme;
 
-          // News List
-          Expanded(
-            child: Obx(() {
-              if (controller.isLoading) {
-                return LoadingShimmer();
-              }
+    return SafeArea(
+      bottom: false,
+      child: Obx(() {
+        if (controller.isLoading && controller.articles.isEmpty) {
+          return const LoadingShimmer();
+        }
+        if (controller.error.isNotEmpty && controller.articles.isEmpty) {
+          return EmptyState(
+            icon: Icons.wifi_off_outlined,
+            title: 'Berita tidak dapat dimuat',
+            message: 'Periksa koneksi internet Anda, lalu coba lagi.',
+            actionLabel: 'Coba Lagi',
+            onAction: controller.refreshNews,
+          );
+        }
+        if (controller.articles.isEmpty) {
+          return EmptyState(
+            icon: Icons.newspaper_outlined,
+            title: 'Belum ada berita',
+            message: 'Tarik layar ke bawah nanti untuk memuat ulang.',
+            actionLabel: 'Muat Ulang',
+            onAction: controller.refreshNews,
+          );
+        }
 
-              if (controller.error.isNotEmpty) {
-                return _buildErrorWidget();
-              }
-
-              if (controller.articles.isEmpty) {
-                return _buildEmptyWidget();
-              }
-
-              return RefreshIndicator(
-                onRefresh: controller.refreshNews,
+        return RefreshIndicator(
+          onRefresh: controller.refreshNews,
+          child: ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.fromLTRB(0, 8, 0, 24),
+            children: [
+              _Header(scheme: scheme),
+              const SizedBox(height: 24),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: SectionHeader(title: 'Sorotan Utama'),
+              ),
+              HeadlineHero(
+                articles: controller.heroArticles,
+                onTap: (a) => Get.toNamed(Routes.detail, arguments: a),
+              ),
+              const SizedBox(height: 28),
+              SizedBox(
+                height: 48,
                 child: ListView.builder(
-                  padding: EdgeInsets.all(16),
-                  itemCount: controller.articles.length,
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  itemCount: controller.categories.length,
                   itemBuilder: (context, index) {
-                    final article = controller.articles[index];
-                    return NewsCard(
-                      article: article,
-                      onTap: () =>
-                          Get.toNamed(Routes.NEWS_DETAIL, arguments: article),
+                    final category = controller.categories[index];
+                    return CategoryChip(
+                      icon: category['icon'] as IconData,
+                      label: category['label'] as String,
+                      isSelected: controller.selectedCategory == category['id'],
+                      onTap: () => controller.selectCategory(category['id'] as String),
                     );
                   },
                 ),
-              );
-            }),
+              ),
+              const SizedBox(height: 28),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: SectionHeader(
+                  title:
+                      'Terbaru · ${Constants.categoryLabel(controller.selectedCategory)}',
+                ),
+              ),
+              if (controller.listArticles.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.only(top: 24),
+                  child: EmptyState(
+                    icon: Icons.inbox_outlined,
+                    title: 'Berita untuk kategori ini belum tersedia',
+                    message: 'Coba pilih kategori lain di atas.',
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Column(
+                    children: controller.listArticles
+                        .map((article) => NewsCard(
+                              article: article,
+                              onTap: () =>
+                                  Get.toNamed(Routes.detail, arguments: article),
+                            ))
+                        .toList(),
+                  ),
+                ),
+            ],
           ),
-        ],
-      ),
+        );
+      }),
     );
   }
+}
 
-  Widget _buildErrorWidget() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+class _Header extends StatelessWidget {
+  final ColorScheme scheme;
+  const _Header({required this.scheme});
+
+  @override
+  Widget build(BuildContext context) {
+    final main = Get.find<MainController>();
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
         children: [
-          Icon(Icons.error_outline, size: 64, color: AppColors.error),
-          SizedBox(height: 16),
-          Text(
-            'Something went wrong',
+          Text.rich(
+            TextSpan(
+              children: [
+                const TextSpan(text: Constants.appName),
+                TextSpan(text: '.', style: TextStyle(color: AppColors.amber)),
+              ],
+            ),
             style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
+              fontSize: 30,
+              fontWeight: FontWeight.w600,
+              letterSpacing: -.5,
+              color: scheme.onSurface,
+              fontFamily: 'Newsreader',
             ),
           ),
-          SizedBox(height: 8),
-          Text(
-            'Please check your internet connection',
-            style: TextStyle(color: AppColors.textSecondary),
+          const Spacer(),
+          // Aksi ikon tetap diberi label tooltip agar terbaca pembaca layar.
+          IconButton(
+            tooltip: 'Cari berita',
+            icon: const Icon(Icons.search, size: 26),
+            onPressed: () => main.changeTab(1),
           ),
-          SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: controller.refreshNews,
-            child: Text('Retry'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyWidget() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.newspaper, size: 64, color: AppColors.textHint),
-          SizedBox(height: 16),
-          Text(
-            'No news available',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          SizedBox(height: 8),
-          Text(
-            'Please try again later',
-            style: TextStyle(color: AppColors.textSecondary),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showSearchDialog(BuildContext context) {
-    final TextEditingController searchController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('Search News'),
-        content: TextField(
-          controller: searchController,
-          decoration: InputDecoration(
-            hintText: 'Enter search term...',
-            border: OutlineInputBorder(),
-          ),
-          onSubmitted: (value) {
-            if (value.isNotEmpty) {
-              controller.searchNews(value);
-              Navigator.of(context).pop();
-            }
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: Text('Cancel'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (searchController.text.isNotEmpty) {
-                controller.searchNews(searchController.text);
-                Navigator.of(context).pop();
-              }
-            },
-            child: Text('Search'),
+          IconButton(
+            tooltip: 'Pengaturan',
+            icon: const Icon(Icons.settings_outlined, size: 26),
+            onPressed: () => main.changeTab(3),
           ),
         ],
       ),

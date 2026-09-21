@@ -23,6 +23,25 @@ class NewsArticle {
       source: json['source'] != null ? Source.fromJson(json['source']) : null,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+        'title': title,
+        'description': description,
+        'url': url,
+        'urlToImage': urlToImage,
+        'publishedAt': publishedAt,
+        'content': content,
+        'source': source?.toJson(),
+      };
+
+  /// Judul bersih: API kadang menyisipkan " - Sumber" di akhir judul.
+  String get cleanTitle {
+    final t = title ?? '';
+    final idx = t.lastIndexOf(' - ');
+    return idx > 0 ? t.substring(0, idx) : t;
+  }
+
+  String get sourceName => source?.name ?? 'Sumber';
 }
 
 class Source {
@@ -34,4 +53,6 @@ class Source {
   factory Source.fromJson(Map<String, dynamic> json) {
     return Source(id: json['id'], name: json['name']);
   }
+
+  Map<String, dynamic> toJson() => {'id': id, 'name': name};
 }
